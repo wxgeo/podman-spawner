@@ -12,6 +12,10 @@ class State(Enum):
 def _format(group: object, version: object) -> tuple[str, str]:
     if isinstance(version, str) and version.startswith("v"):
         version = version[1:].strip()
+    try:
+        float(version)
+    except ValueError:
+        raise ValueError(f"Unsupported version number: {version}.")
     return str(group).lower(), str(float(version))
 
 

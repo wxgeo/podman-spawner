@@ -74,7 +74,7 @@ def run_container(group: object, version: object) -> None:
                 IMG_NAME,
             )
             print(f"Port forwarding: {port}->{PORT}")
-    podman("cp", COPY_PATH / version, f"{name}:/usr/src/app")
+    podman("cp", f"{COPY_PATH / version / group}/.", f"{name}:/usr/src/app")
 
 
 # pod go
