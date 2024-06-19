@@ -1,102 +1,99 @@
-from enum import Enum
-from subprocess import run
-
 import fire
 
-from pod.config import IMG_NAME, PORT
+from pod.config import IMG_NAME, PORT, COPY_PATH
+from pod.tools import _name, state, host_port, _format, State, podman, containers_states
 
 
-# def cmd(command: str):
+# pod info
+def info(group: object, version: object) -> None:
+    group, version = _format(group, version)
+    print("Container name:", _name(group, version))
+    print("State:", state(group, version).name)
+    port = host_port(group, version)
+    print(f"Port forwarding: {port}->{PORT}")
 
 
-class State(Enum):
-    UP = 0
-    CREATED = 2
-    EXITED = 3
-    NOT_FOUND = 4
-
-
-def _name(group: str, version: str) -> str:
-    return f"{group}-{version}"
-
-
-def state(group: str, version: str) -> str:
-    completed_process = run(["podman", "ps", "-a"], encoding="utf8")
-    lines = completed_process.stdout.split("\n")
-    print(repr(lines))
-    return
-
-
-def print_sate(group, version):
-    return print(state(group, version))
-
-
-def host_port(group: str, version: str) -> int:
-    if version.startswith("v"):
-        version = version[1:].strip()
-    if len(group) > 1:
-        raise NotImplementedError(
-            "Le nom du groupe doit avoir un seule caractère (lettre/chiffre),"
-            " ou être un nombre."
-        )
-    if group.isdigit():
-        n = int(group)
-    else:
-        n = ord(group)
-    return 9000 + int(100 * float(version)) + n
-
-
-def build_image():
-    """Build the image."""
-    run(["podman", "build", "-t", IMG_NAME])
-
-
-def test_image():
-    """Create a temporary container to test the image."""
-    run(
-        [
-            "podman",
-            "run",
-            "--interactive",
-            "--rm",
-            "--env='DISPLAY'",
-            "--net=host",
-            IMG_NAME,
-        ]
+# pod list
+def list_containers():
+    podman(
+        "ps",
+        "-a",
+        "--format",
+        "table {{.Names}}\t{{.Status}}\t{{.Ports}}",
+        "--filter",
+        "name=^SAE-",
     )
 
 
-def run_container(group, version):
+# pod build
+def build_image() -> None:
+    """Build the image."""
+    podman("build", "-t", IMG_NAME)
+
+
+# pod test
+def test_image() -> None:
+    """Create a temporary container to test the image."""
+    podman(
+        "run",
+        "-it",  # `--interactive` hangs, but `-it` is ok!!!
+        "--rm",
+        "--env='DISPLAY'",
+        "--net=host",
+        IMG_NAME,
+    )
+
+
+# (pod new)
+def run_container(group: object, version: object) -> None:
     """Start a new container for this group/version if needed.
 
     If a container already exist, print a warning and do nothing
     (use manually `pod reset` if needed).
     """
+    group, version = _format(group, version)
+    name = _name(group, version)
     port = host_port(group, version)
-    run(
-        [
-            "podman",
-            "run",
-            "--name",
-            _name(group, version),
-            "--env=DISPLAY",
-            "--publish",
-            f"{port}:{PORT}",
-            IMG_NAME,
-        ]
-    )
-    print(f"Port forwarding: {port}->{PORT}")
+    match state(group, version):
+        case State.UP:
+            pass
+        case State.EXITED:
+            podman("start", name)
+        case State.CREATED:
+            podman("start", name)
+        case State.NOT_FOUND:
+            podman(
+                "run",
+                "-d",
+                "-t",
+                "--name",
+                name,
+                "--env=DISPLAY",
+                "--publish",
+                f"{port}:{PORT}",
+                IMG_NAME,
+            )
+            print(f"Port forwarding: {port}->{PORT}")
+    podman("cp", COPY_PATH / version, f"{name}:/usr/src/app")
 
 
-def attach_container(group, version):
+# pod go
+def attach_container(group: object, version: object) -> None:
     """Show the container for this group/version.
 
-    Start it if needed.
+    Start or create it if needed.
     """
-    run(["podman", "attach", _name(group, version)])
+    group, version = _format(group, version)
+    name = _name(group, version)
+    if state(group, version) == State.NOT_FOUND:
+        run_container(group, version)
+    elif state(group, version) == State.EXITED:
+        podman("start", name)
+    podman("attach", name)
 
 
-def reset_container(group, version, force=True):
+# pod reset
+def reset_container(group: object, version: object, force=False) -> None:
     """Reset the container for this group/version.
 
     To force the reset of a running container:
@@ -106,13 +103,46 @@ def reset_container(group, version, force=True):
     The `--force` argument must be last one, due to a limitation
     in the python-fire library.
     """
+    group, version = _format(group, version)
     if not isinstance(force, bool):
         raise ValueError(f"Invalid argument: {force}.")
-    run(["podman", "rm", _name(group, version)])
+    remove_container(group, version, force=force)
+    run_container(group, version)
 
 
-def exit_container(group, version):
-    """Exit"""
+# pod rm
+def remove_container(group, version, force=False) -> None:
+    """Remove definitively a container.
+
+    The `--force` argument must be last one, due to a limitation
+    in the python-fire library.
+    """
+    group, version = _format(group, version)
+    if not isinstance(force, bool):
+        raise ValueError(f"Invalid argument: {force}.")
+    if force:
+        podman("rm", "-f", _name(group, version))
+    else:
+        podman("rm", _name(group, version))
+
+
+# pode purge
+def purge_containers(version: object, force=False) -> None:
+    """Remove all containers for a given version."""
+    _, version = _format("A", version)
+    count = 0
+    for container in containers_states():
+        assert container.startswith("SAE-")
+        assert "-" in container[4:]
+        gp, vers = container[4:].split("-")
+        if vers == version:
+            count += 1
+            if state(gp, vers) == State.UP:
+                name = _name(gp, vers)
+                print(f"Warning: {name} is running. Use pod show {name} to show it.")
+            remove_container(gp, vers, force=force)
+    if count == 0:
+        print(f"No container found for version {version}.")
 
 
 def main():
@@ -120,12 +150,13 @@ def main():
         {
             "build": build_image,
             "test": test_image,
-            "new": run_container,
-            "show": attach_container,
+            # "new": run_container,
+            "go": attach_container,
             "reset": reset_container,
-            "port": host_port,
-            "exit": exit_container,
-            "state": print_state,
+            "rm": remove_container,
+            "info": info,
+            "purge": purge_containers,
+            "list": list_containers,
         }
     )
 
