@@ -7,7 +7,14 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+fire = "^0.6.0"
 
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.4.2"
+
+[tool.poetry.scripts]
+pod = 'pod.cli:main'
 
 [build-system]
 requires = ["poetry-core"]
