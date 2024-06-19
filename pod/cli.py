@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import fire
 
 from pod.config import IMG_NAME, PORT, COPY_PATH
@@ -28,7 +30,7 @@ def list_containers():
 # pod build
 def build_image() -> None:
     """Build the image."""
-    podman("build", "-t", IMG_NAME)
+    podman("build", "-t", IMG_NAME, str(Path(__file__).parent.parent))
 
 
 # pod test
