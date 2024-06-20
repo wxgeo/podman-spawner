@@ -23,8 +23,9 @@ RUN echo "LC_ALL=en_US.UTF-8" >> /etc/environment && \
 
 # Copier les fichiers dans le conteneur.
 #COPY launch.py /usr/bin/launch
-COPY data/start.bash .start
-COPY data/compile_all.bash compile_all
+COPY scripts/start.bash .start
+COPY scripts/compile_all.bash compile_all
+COPY scripts/run.bash run
 
 # --------------------------------
 # Partie à adapter

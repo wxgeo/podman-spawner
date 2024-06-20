@@ -81,7 +81,15 @@ def run_container(group: object, version: object) -> None:
             )
             print(f"Port forwarding: {port}->{PORT}")
     podman("cp", f"{COPY_PATH / version / group}/.", f"{name}:/usr/src/app")
-    podman("exec", "-d", name, "chmod", "u+x", "/usr/src/app/compile_all")
+    podman(
+        "exec",
+        "-d",
+        name,
+        "chmod",
+        "u+x",
+        "/usr/src/app/compile_all",
+        "/usr/src/app/run",
+    )
     podman("exec", "-d", name, "bash", "/usr/src/app/compile_all")
 
 

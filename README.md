@@ -7,11 +7,15 @@ mais sans avoir besoin des permissions `root`.
 
 Pour l'installer :
 ```
-    sudo apt install podman
+    sudo apt install podman containers-storage
 ```
 
-Pour pouvoir accès au dépôt par défaut de Docker via Podman, 
-il faut configurer les registres de containeurs :
+Le package `containers-storage` n'est pas strictement indispensable, mais il accélère considérablement la génération d'images.
+
+Vérifier que `podman info | grep graphDriverName` renvoie bien `overlay` (et non `vfs` par défaut).
+
+Pour avoir accès au dépôt par défaut de Docker via Podman, 
+il faut maintenant configurer les registres de containeurs :
 ```
     mkdir ~/.config/containers/
     echo 'unqualified-search-registries = ["docker.io"]' >> ~/.config/containers/registries.conf
