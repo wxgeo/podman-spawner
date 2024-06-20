@@ -8,6 +8,7 @@ from pod.tools import _name, state, host_port, _format, State, podman, container
 
 # pod info
 def info(group: object, version: object) -> None:
+    """Give some information on a container."""
     group, version = _format(group, version)
     print("Container name:", _name(group, version))
     print("State:", state(group, version).name)
@@ -17,6 +18,7 @@ def info(group: object, version: object) -> None:
 
 # pod list
 def list_containers():
+    """List the current containers."""
     podman(
         "ps",
         "-a",
@@ -38,10 +40,12 @@ def test_image() -> None:
     """Create a temporary container to test the image."""
     podman(
         "run",
-        "-it",  # `--interactive` hangs, but `-it` is ok!!!
+        "--interactive",
+        "--tty",  # `--tty` or `-t` is mandatory here!
         "--rm",
         "--env='DISPLAY'",
         "--net=host",
+        "--env color_prompt=yes",
         IMG_NAME,
     )
 
@@ -77,6 +81,8 @@ def run_container(group: object, version: object) -> None:
             )
             print(f"Port forwarding: {port}->{PORT}")
     podman("cp", f"{COPY_PATH / version / group}/.", f"{name}:/usr/src/app")
+    podman("exec", "-d", name, "chmod", "u+x", "/usr/src/app/compile_all")
+    podman("exec", "-d", name, "bash", "/usr/src/app/compile_all")
 
 
 # pod go
@@ -94,7 +100,7 @@ def attach_container(group: object, version: object) -> None:
     podman("attach", name)
 
 
-# pod reset
+# (pod reset)
 def reset_container(group: object, version: object, force=False) -> None:
     """Reset the container for this group/version.
 
@@ -128,23 +134,41 @@ def remove_container(group, version, force=False) -> None:
         podman("rm", _name(group, version))
 
 
-# pode purge
-def purge_containers(version: object, force=False) -> None:
+def _purge_containers(version: object = None, force=False) -> None:
     """Remove all containers for a given version."""
-    _, version = _format("A", version)
+    if version is not None:
+        _, version = _format("A", version)
     count = 0
     for container in containers_states():
         assert container.startswith("SAE-")
         assert "-" in container[4:]
         gp, vers = container[4:].split("-")
-        if vers == version:
+        if vers == version or version is None:
             count += 1
             if state(gp, vers) == State.UP:
                 name = _name(gp, vers)
-                print(f"Warning: {name} is running. Use pod show {name} to show it.")
+                print(f"Warning: {name} is running. Use pod go {gp} {vers} to show it.")
             remove_container(gp, vers, force=force)
     if count == 0:
-        print(f"No container found for version {version}.")
+        print(
+            (
+                f"No container found"
+                + ("" if version is None else f" for version {version}")
+                + "."
+            ),
+        )
+
+
+# pode purge
+def purge_containers(version: object, force=False) -> None:
+    """Remove all containers for a given version."""
+    _purge_containers(version, force=force)
+
+
+# pod armaggedon
+def purge_all_containers(force=False) -> None:
+    """Remove all containers."""
+    _purge_containers(force=force)
 
 
 def main():
@@ -154,10 +178,11 @@ def main():
             "test": test_image,
             # "new": run_container,
             "go": attach_container,
-            "reset": reset_container,
+            # "reset": reset_container,
             "rm": remove_container,
-            "info": info,
             "purge": purge_containers,
+            "armaggedon": purge_all_containers,
+            "info": info,
             "list": list_containers,
         }
     )

@@ -93,26 +93,18 @@ Nous allons maintenant générer à la volée un containeur pour chaque test (gr
 
 Le script python `pod` facilitera les choses.
 
-Pour démarrer ou redémarrer un conteneur :
+Pour créer ou activer un conteneur :
 
 ```
-    pod start <groupe> <version>
+    pod go <groupe> <version>
 ```
 
-Pour activer un conteneur (1er plan) :
+Pour détruire un conteneur :
 ```
-    pod show <group> <version>
-```
-
-Pour quitter un conteneur :
-```
-    pod exit <group> <version>
+    pod rm <group> <version>
 ```
 
-Pour réinitialiser un conteneur :
-```
-    pod reset <group> <version>
-```
+
 
 
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 echo -e "\e[33;3m"
 echo "--------------------------------------"
 echo "            Bienvenue !"
