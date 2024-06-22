@@ -10,7 +10,7 @@ ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
 # Ne pas installer la version de base de firefox (qui utilise snap !)
 RUN apt update; apt upgrade
 RUN install_packages openjdk-17-jre openjdk-17-jdk firefox-esr ipython3 \
-    bash-completion command-not-found python git tree locales
+    bash-completion command-not-found python git tree locales nano
 RUN apt update; apt upgrade
 RUN echo "LC_ALL=en_US.UTF-8" >> /etc/environment && \
     echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen && \
@@ -23,15 +23,14 @@ RUN echo "LC_ALL=en_US.UTF-8" >> /etc/environment && \
 
 # Copier les fichiers dans le conteneur.
 #COPY launch.py /usr/bin/launch
-COPY scripts/start.bash .start
-COPY scripts/compile_all.bash compile_all
-COPY scripts/run.bash run
+COPY scripts/* /usr/local/bin
+COPY config-files/* /root
+RUN chmod u+x /usr/local/bin/*
 
 # --------------------------------
 # Partie à adapter
 #COPY bin bin
 # --------------------------------
 
-# Commande à lancer après l'installation
-CMD ["/bin/bash", ".start"]
+
 

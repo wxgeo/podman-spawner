@@ -2,7 +2,7 @@ from pathlib import Path
 
 import fire
 
-from pod.config import IMG_NAME, PORT, COPY_PATH
+from pod.config import IMG_NAME, PORT, COPY_PATH, PROMPT
 from pod.tools import _name, state, host_port, _format, State, podman, containers_states
 
 
@@ -35,7 +35,7 @@ def build_image() -> None:
     podman("build", "-t", IMG_NAME, str(Path(__file__).parent.parent))
 
 
-# pod test
+# (pod test: Deprecated)
 def test_image() -> None:
     """Create a temporary container to test the image."""
     podman(
@@ -50,7 +50,7 @@ def test_image() -> None:
     )
 
 
-# (pod new)
+# (pod new: Deprecated)
 def run_container(group: object, version: object) -> None:
     """Start a new container for this group/version if needed.
 
@@ -75,6 +75,12 @@ def run_container(group: object, version: object) -> None:
                 "--name",
                 name,
                 "--env=DISPLAY",
+                "-v",
+                "/tmp/.X11-unix:/tmp/.X11-unix",
+                "--hostname",
+                name,
+                "--env",
+                "TERM=xterm-256color",
                 "--publish",
                 f"{port}:{PORT}",
                 IMG_NAME,
@@ -90,7 +96,25 @@ def run_container(group: object, version: object) -> None:
         "/usr/src/app/compile_all",
         "/usr/src/app/run",
     )
-    podman("exec", "-d", name, "bash", "/usr/src/app/compile_all")
+    podman("exec", "-d", name, "bash", "/usr/local/bin/compile_all")
+    podman("exec", name, "sh", "-c", f"echo {name} >> /usr/src/.about")
+    # podman(
+    #     "exec",
+    #     name,
+    #     "bash",
+    #     "-c",
+    #     # f"echo \"export PS1='\\H:\\w\\# '\n\" >> /root/.bashrc",
+    #     f"""echo "export PS1={PROMPT!r}" >> /root/.bashrc""",
+    # )
+    # podman(
+    #     "exec",
+    #     name,
+    #     "bash",
+    #     "-c",
+    #     # f"echo \"export PS1='\\H:\\w\\# '\n\" >> /root/.bashrc",
+    #     f"""export PS1={PROMPT!r}""",
+    # )
+    podman("exec", name, "bash", "/usr/local/bin/.welcome", name)
 
 
 # pod go
@@ -108,7 +132,7 @@ def attach_container(group: object, version: object) -> None:
     podman("attach", name)
 
 
-# (pod reset)
+# (pod reset: Deprecated)
 def reset_container(group: object, version: object, force=False) -> None:
     """Reset the container for this group/version.
 
@@ -179,11 +203,11 @@ def purge_all_containers(force=False) -> None:
     _purge_containers(force=force)
 
 
-def main():
+def main() -> None:
     fire.Fire(
         {
             "build": build_image,
-            "test": test_image,
+            # "test": test_image,
             # "new": run_container,
             "go": attach_container,
             # "reset": reset_container,

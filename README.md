@@ -92,23 +92,39 @@ Si le conteneur s'appelle `HELLO`, on copie les fichiers locaux dessus via :
     podman cp ../rendus/0.1/a/ HELLO:/usr/src/app/
 ```
 
-## Automatisation
+## Automatisation via `pod`
 Nous allons maintenant générer à la volée un containeur pour chaque test (groupe + version).
 
-Le script python `pod` facilitera les choses.
+Le script python `pod` facilitera les choses :
 
-Pour créer ou activer un conteneur :
+- Pour générer l'image (template) des différents conteneurs à partir du fichier Dockerfile :
+
+```
+    pod build
+```
+
+- Pour créer ou activer un conteneur :
 
 ```
     pod go <groupe> <version>
 ```
 
-Pour détruire un conteneur :
+- Pour détruire un conteneur :
 ```
     pod rm <group> <version>
 ```
 
+- Pour détruire tous les conteneurs d'une version :
+```
+    pod purge <version>
+```
 
+- Pour détruire l'ensemble des conteneurs :
+```
+    pod armaggedon
+```
+
+Enfin, `pod info <groupe> <version>` permet d'avoir des infos sur le conteneur ciblé, et `pod list` permet d'avoir la liste des conteneurs.
 
 
 
