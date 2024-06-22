@@ -114,7 +114,7 @@ def run_container(group: object, version: object) -> None:
     #     # f"echo \"export PS1='\\H:\\w\\# '\n\" >> /root/.bashrc",
     #     f"""export PS1={PROMPT!r}""",
     # )
-    podman("exec", name, "bash", "/usr/local/bin/.welcome", name)
+    podman("exec", name, "bash", "/usr/local/bin/_welcome_", name)
 
 
 # pod go
@@ -168,6 +168,7 @@ def remove_container(group, version, force=False) -> None:
 
 def _purge_containers(version: object = None, force=False) -> None:
     """Remove all containers for a given version."""
+    print("Removing containers:")
     if version is not None:
         _, version = _format("A", version)
     count = 0
