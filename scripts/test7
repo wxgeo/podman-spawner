@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+rm -rf /root/.config/edt
+mkdir -p /root/.config/edt
+cp -r /root/prototype/edt/tests/assets/config2/* /root/.config/edt
+sae creer --force
+edt verifier

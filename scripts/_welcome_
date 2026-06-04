@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 echo -e "\e[33;3m"
 echo "--------------------------------------"
-echo "            Bienvenue !"
+echo "            Hello !"
 echo "  Vous êtes sur un conteneur de test"
 echo "  du projet de SAÉ : $1."
 echo "--------------------------------------"

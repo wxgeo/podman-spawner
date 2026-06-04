@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+both verifier --cfg /root/prototype/edt/tests/assets/config

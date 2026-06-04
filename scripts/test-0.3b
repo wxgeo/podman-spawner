@@ -1,0 +1,5 @@
+#!/bin/bash
+
+mkdir -p ~/.config/edt
+cp -r /root/prototype/edt/tests/assets/config/* ~/.config/edt
+both voir --groupe G1 10

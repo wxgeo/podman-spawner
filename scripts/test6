@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+mkdir -p /root/planning
+sae creer --cfg /root/prototype/edt/tests/assets/config2 --dst /root/planning --force
+edt verifier --cfg /root/prototype/edt/tests/assets/config2 --src /root/planning

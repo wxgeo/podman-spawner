@@ -1,5 +1,10 @@
 from enum import Enum
+from pathlib import Path
 from subprocess import run
+
+SCRIPTS_PATH = Path(__file__).parent.parent / "scripts"
+assert SCRIPTS_PATH.resolve()
+assert SCRIPTS_PATH.is_dir()
 
 
 class State(Enum):

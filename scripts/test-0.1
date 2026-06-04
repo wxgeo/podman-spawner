@@ -1,0 +1,12 @@
+#!/bin/bash
+
+FILES=("CM.java" "Creneau.java" "Enseignant.java" "Heure.java" "JoursSemaines.java" "Seance.java" "TD.java"
+"Edt.java" "Groupe.java" "Jour.java" "Ressource.java" "Semaine.java")
+
+for NAME in "${FILES[@]}"; do
+    if find . -type f -name "$NAME" -print -quit | grep -q .; then
+        echo "$NAME: OK"
+    else
+        echo "$NAME: X"
+    fi
+done

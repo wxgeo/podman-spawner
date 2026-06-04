@@ -3,7 +3,16 @@ from pathlib import Path
 import fire
 
 from pod.config import IMG_NAME, PORT, COPY_PATH, PROMPT
-from pod.tools import _name, state, host_port, _format, State, podman, containers_states
+from pod.tools import (
+    _name,
+    state,
+    host_port,
+    _format,
+    State,
+    podman,
+    containers_states,
+    SCRIPTS_PATH,
+)
 
 
 # pod info
@@ -35,22 +44,6 @@ def build_image() -> None:
     podman("build", "-t", IMG_NAME, str(Path(__file__).parent.parent))
 
 
-# (pod test: Deprecated)
-def test_image() -> None:
-    """Create a temporary container to test the image."""
-    podman(
-        "run",
-        "--interactive",
-        "--tty",  # `--tty` or `-t` is mandatory here!
-        "--rm",
-        "--env='DISPLAY'",
-        "--net=host",
-        "--env color_prompt=yes",
-        IMG_NAME,
-    )
-
-
-# (pod new: Deprecated)
 def run_container(group: object, version: object) -> None:
     """Start a new container for this group/version if needed.
 
@@ -87,6 +80,11 @@ def run_container(group: object, version: object) -> None:
             )
             print(f"Port forwarding: {port}->{PORT}")
     podman("cp", f"{COPY_PATH / version / group}/.", f"{name}:/usr/src/app")
+    # podman(
+    #     "cp",
+    #     f"{SCRIPTS_PATH / 'webpagesaver'}",
+    #     f"{name}:/usr/src/app/webpagesaver/webpagesaver",
+    # )
     podman(
         "exec",
         "-d",
@@ -98,22 +96,6 @@ def run_container(group: object, version: object) -> None:
     )
     podman("exec", "-d", name, "bash", "/usr/local/bin/compile_all")
     podman("exec", name, "sh", "-c", f"echo {name} >> /usr/src/.about")
-    # podman(
-    #     "exec",
-    #     name,
-    #     "bash",
-    #     "-c",
-    #     # f"echo \"export PS1='\\H:\\w\\# '\n\" >> /root/.bashrc",
-    #     f"""echo "export PS1={PROMPT!r}" >> /root/.bashrc""",
-    # )
-    # podman(
-    #     "exec",
-    #     name,
-    #     "bash",
-    #     "-c",
-    #     # f"echo \"export PS1='\\H:\\w\\# '\n\" >> /root/.bashrc",
-    #     f"""export PS1={PROMPT!r}""",
-    # )
     podman("exec", name, "bash", "/usr/local/bin/_welcome_", name)
 
 
@@ -130,24 +112,6 @@ def attach_container(group: object, version: object) -> None:
     elif state(group, version) == State.EXITED:
         podman("start", name)
     podman("attach", name)
-
-
-# (pod reset: Deprecated)
-def reset_container(group: object, version: object, force=False) -> None:
-    """Reset the container for this group/version.
-
-    To force the reset of a running container:
-
-        pod reset <group> <version> --force
-
-    The `--force` argument must be last one, due to a limitation
-    in the python-fire library.
-    """
-    group, version = _format(group, version)
-    if not isinstance(force, bool):
-        raise ValueError(f"Invalid argument: {force}.")
-    remove_container(group, version, force=force)
-    run_container(group, version)
 
 
 # pod rm
@@ -208,10 +172,7 @@ def main() -> None:
     fire.Fire(
         {
             "build": build_image,
-            # "test": test_image,
-            # "new": run_container,
             "go": attach_container,
-            # "reset": reset_container,
             "rm": remove_container,
             "purge": purge_containers,
             "armaggedon": purge_all_containers,

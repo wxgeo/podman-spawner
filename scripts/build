@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Compile the Java project.
+javac -encoding utf8 -cp edt/src:/root/junit -d edt/bin $(find edt/src -name '*.java' ! -name '*Test.java' ! -path '*/test*') \
+&& echo "Compilation successful." || echo "Compilation failed."
