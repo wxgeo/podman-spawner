@@ -1,38 +1,112 @@
-# Utilisation de Podman pour les SAÉ
+# Utilisation de pod, interface pour Podman
 
-## Utilisation de Podman
-### Avant de commencer
-Podman s'utilise pratiquement comme Docker (mêmes commandes), 
-mais sans avoir besoin des permissions `root`.
+`pod` permet de générer à la volée un conteneur pour chaque test (groupe + version).
+
+
+## Sommaire
+ - [Avant de commencer](#avant-de-commencer)
+ - [Utilisation de `pod`](#utilisation-de-pod)
+ - [Utilisation de Podman (facultatif)](#utilisation-de-podman-facultatif) 
+
+
+## Avant de commencer
+`pod` est une surcouche de Podman. Il faut donc commencer par installer Podman (alternative à Docker).
 
 Pour l'installer :
 ```
     sudo apt install podman containers-storage
 ```
 
-Le package `containers-storage` n'est pas strictement indispensable, mais il accélère considérablement la génération d'images.
+Le package `containers-storage` n'est pas strictement indispensable, mais il accélère considérablement 
+la génération d'images.
 
-Vérifier que `podman info | grep graphDriverName` renvoie bien `overlay` (et non `vfs` par défaut).
+Vérifier que `podman info | grep graphDriverName` renvoie bien maintenant `overlay` (et non `vfs` par défaut).
 
 Pour avoir accès au dépôt par défaut de Docker via Podman, 
-il faut maintenant configurer les registres de containeurs :
+il faut maintenant configurer les registres de conteneurs :
 ```
     mkdir ~/.config/containers/
     echo 'unqualified-search-registries = ["docker.io"]' >> ~/.config/containers/registries.conf
 ```
 
-On commence ensuite par générer une image, 
-puis on va l'utiliser pour démarrer des conteneurs 
-(un par projet étudiant, pour les isoler).
+
+
+
+## Utilisation de `pod`
+### Installation
+Si besoin, installer `uv`:
+```
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Aller ensuite dans le dossier principal de `pod`, puis taper :
+```
+    uv tool install -e .
+```
+
+La commande `pod` est maintenant disponible pour l'utilisateur courant.
+
+
+### Commandes
+`pod` permet de générer à la volée un conteneur pour chaque test (groupe + version).
+
+
+- Avant toute chose, il faut commencer par générer une image (template), qui servira ensuite de base 
+  pour tous les différents conteneurs. Cette image est générée à partir du fichier Dockerfile.
+
+```
+    pod build
+```
+On peut spécifier des dossiers à inclure via l'option `--assets` :
+```
+    pod build --assets dossier1,dossier2
+```
+
+
+
+- Pour créer ou activer un conteneur :
+
+```
+    pod go <groupe> <version>
+```
+
+- Pour détruire un conteneur :
+```
+    pod rm <group> <version>
+```
+
+- Pour détruire tous les conteneurs d'une version :
+```
+    pod purge <version>
+```
+
+- Pour détruire l'ensemble des conteneurs :
+```
+    pod armaggedon
+```
+
+Enfin, `pod info <groupe> <version>` permet d'avoir des infos sur le conteneur ciblé, et `pod list` permet d'avoir la liste des conteneurs.
+
+
+## Utilisation de Podman (facultatif)
+
+Podman s'utilise pratiquement comme Docker (mêmes commandes), 
+mais sans avoir besoin des permissions `root`.
 
 
 ### Création d'une image
-La génération de l'image se fait à partir du fichier `Dockerfile`, 
-en partant d'une version allégée de Debian 11.
+On suppose Podman correctement installé et configuré.
 
-Nous nommons `sae` notre image.
+On commence par générer une image, 
+puis on va l'utiliser pour démarrer des conteneurs 
+(un par projet étudiant, pour les isoler).
+
+La génération de l'image se fait à partir du fichier `Dockerfile`, 
+en partant d'une version allégée de Debian 13.
+
+Nous nommons `sae` notre image. Allez dans le répertoire contenant le `Dockerfile`, puis exécutez :
 ```
-    podman build -t sae:latest
+    podman build -t sae:latest .
 ```
 
 Pour tester l'image (en permettant d'exécuter des applications graphiques) :
@@ -91,40 +165,4 @@ Si le conteneur s'appelle `HELLO`, on copie les fichiers locaux dessus via :
 ```
     podman cp ../rendus/0.1/a/ HELLO:/usr/src/app/
 ```
-
-## Automatisation via `pod`
-Nous allons maintenant générer à la volée un containeur pour chaque test (groupe + version).
-
-Le script python `pod` facilitera les choses :
-
-- Pour générer l'image (template) des différents conteneurs à partir du fichier Dockerfile :
-
-```
-    pod build
-```
-
-- Pour créer ou activer un conteneur :
-
-```
-    pod go <groupe> <version>
-```
-
-- Pour détruire un conteneur :
-```
-    pod rm <group> <version>
-```
-
-- Pour détruire tous les conteneurs d'une version :
-```
-    pod purge <version>
-```
-
-- Pour détruire l'ensemble des conteneurs :
-```
-    pod armaggedon
-```
-
-Enfin, `pod info <groupe> <version>` permet d'avoir des infos sur le conteneur ciblé, et `pod list` permet d'avoir la liste des conteneurs.
-
-
 

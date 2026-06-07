@@ -16,4 +16,12 @@ export LS_OPTIONS='--color=auto'
 # alias rm='rm -i'
 # alias cp='cp -i'
 # alias mv='mv -i'
+# Some color, please! :)
 export PS1='\[\e[1;36m\]\H\[\e[0;36m\]:\w # \[\e[0m\]'
+# set PATH so it includes user's private bin if it exists
+if [ -d "$HOME/bin" ] ; then
+    PATH="$HOME/bin:$PATH"
+    for d in "$HOME/bin"/*/; do PATH="$d:$PATH"; done
+# set PATH so it includes user's private bin if it exists
+if [ -d "$HOME/.local/bin" ] ; then
+    PATH="$HOME/.local/bin:$PATH"
