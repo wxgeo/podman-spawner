@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# Check the number of arguments
-tree -P "*.java" --prune
-
-
-

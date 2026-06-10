@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-cd /usr/src/app/
-java  -cp /usr/src/app/edt/bin edt.Edt "$@"

@@ -1,3 +1,0 @@
-#!/bin/bash
-# Run colordiff with process substitution
-delta <(edt "$@") <(sae "$@")

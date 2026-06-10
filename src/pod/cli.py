@@ -3,39 +3,31 @@ import shutil
 import sys
 from pathlib import Path
 
-import fire
+import fire  # type: ignore
 from colored_messages import print_error, print_info, print_success, print_warning
 
 from pod.config import (
     ASSETS_DIR,
-    COPY_PATH,
-    IMG_NAME,
     POD_BUILD_DIRNAME,
-    PORT,
-    PREFIX,
-    SAE_ID,
+    TEST,
 )
+from pod.port import port_from_name
 from pod.tools import (
     State,
-    container_name,
+    config,
     containers_states,
-    format,
     get_state,
-    get_state2,
-    group_version,
-    host_port,
     podman,
 )
 
 
 # pod info
-def info(group: str, version: str) -> None:
+def info(name: str) -> None:
     """Give some information on a container."""
-    group, version = format(group, version)
-    print("Container name:", container_name(group, version))
-    print("State:", get_state2(group, version).name)
-    port = host_port(group, version)
-    print(f"Port forwarding: {port}->{PORT}")
+    print("Container name:", name)
+    print("State:", get_state(name).name)
+    print("Port forwarding:")
+    podman("port", name)
 
 
 # pod list
@@ -47,7 +39,7 @@ def list_containers():
         "--format",
         "table {{.Names}}\t{{.Status}}\t{{.Ports}}",
         "--filter",
-        f"name=^{PREFIX}",
+        f"name=^{config().prefix}",
     )
 
 
@@ -83,12 +75,9 @@ def initialize_directory(force: bool = False, update: str | Path | None = None) 
 
 
 # pod build
-def build_image(user: str = "tester") -> None:
+def build_image() -> None:
     """
     Build the image.
-
-    Arguments:
-        - user: the username that will be used in the container.
     """
     cwd = Path.cwd()
     invalid_dir = False
@@ -101,33 +90,40 @@ def build_image(user: str = "tester") -> None:
     if invalid_dir:
         print_info("Hint: use `pod init` to initialize a pod directory.")
         sys.exit(1)
+    user = config().user
     if not re.fullmatch("^[a-zA-Z_][a-zA-Z0-9_]*$", user):
         print_error(f"Invalid user name: {user!r}.")
         sys.exit(1)
+    image_name = config().image_name
     podman_args = [
         "build",
         "-t",
-        IMG_NAME,
+        image_name,
         "--build-arg",
         f"USER={user}",
         str(cwd),
     ]
     if podman(*podman_args):
-        print_success(f"Image {IMG_NAME} build.")
+        print_success(f"Image {image_name} built.")
     else:
         print_error("Build process failed. (See details above).")
 
 
-def _run_container(name: str, port: int) -> bool:
+def _run_container(name: str, host_port: int) -> bool:
+    guest_port = config().port
     match get_state(name):
         case State.UP:
             return True
-        case State.EXITED:
-            return podman("start", name)
-        case State.CREATED:
-            return podman("start", name)
+        case State.EXITED | State.CREATED:
+            if podman("start", name):
+                return True
+            print_warning(
+                f"Could not restart {name!r}; recreating with current port mapping."
+            )
+            podman("rm", "-f", name)
+            return _run_container(name, host_port)
         case State.NOT_FOUND:
-            print(f"Port forwarding: {port}->{PORT}")
+            print(f"Port forwarding: {host_port}->{guest_port}")
             return podman(
                 "run",
                 "-d",
@@ -142,64 +138,65 @@ def _run_container(name: str, port: int) -> bool:
                 "--env",
                 "TERM=xterm-256color",
                 "--publish",
-                f"{port}:{PORT}",
-                IMG_NAME,
+                f"{host_port}:{guest_port}",
+                config().image_name,
             )
         case _:
             raise NotImplementedError
 
 
-# pod test
-def test_image():
-    _run_container(f"{PREFIX}-test", 9999)
-
-
-def run_container(group: str, version: str) -> None:
-    """Start a new container for this group/version if needed.
+def run_container(
+    name: str,
+    host_port: int | None = None,
+    copy: str | Path | None = None,
+    script: str | Path | None = None,
+) -> None:
+    """Start a new container with this name.
 
     If a container already exist, print a warning and do nothing
     (use manually `pod reset` if needed).
     """
-    group, version = format(group, version)
-    name = container_name(group, version)
-    port = host_port(group, version)
-    _run_container(name, port)
-    podman("cp", f"{COPY_PATH / version / group}/.", f"{name}:/usr/src/app")
-    # podman(
-    #     "cp",
-    #     f"{SCRIPTS_PATH / 'webpagesaver'}",
-    #     f"{name}:/usr/src/app/webpagesaver/webpagesaver",
-    # )
-    podman(
-        "exec",
-        "-d",
-        name,
-        "chmod",
-        "u+x",
-        "/usr/src/app/compile_all",
-        "/usr/src/app/run",
-    )
-    podman("exec", "-d", name, "bash", "/usr/local/bin/compile_all")
-    podman("exec", name, "sh", "-c", f"echo {name} >> /usr/src/.about")
-    podman("exec", name, "bash", "/usr/local/bin/_welcome_", name)
+    if host_port is None:
+        host_port = port_from_name(name)
+    _run_container(name, host_port)
+    home = Path(f"/home/{config().user}/")
+    if copy is not None:
+        # Docker documentation specifies to add "/." at the end of the source
+        # path, so as to copy the folder content (and not the folder itself).
+        podman("cp", f"{copy}/.", f"{name}:{home}")
+    if script is not None:
+        script = Path(script)
+        podman("cp", f"{script}", f"{name}:{home / script.name}")
+        podman(
+            "exec",
+            "-d",
+            name,
+            "bash",
+            f"{home / script.name}",
+        )
+
+
+# pod test
+def test_image():
+    attach_container(f"{config().prefix}-{TEST}")
 
 
 # pod go
-def attach_container(group: str, version: str) -> None:
+def attach_container(name: str) -> None:
     """Show the container for this group/version.
 
     Start or create it if needed.
     """
-    group, version = format(group, version)
-    name = container_name(group, version)
-    if get_state2(group, version) == State.NOT_FOUND:
-        run_container(group, version)
-    elif get_state2(group, version) == State.EXITED:
+    state = get_state(name)
+    if state == State.NOT_FOUND:
+        run_container(name)
+    elif state == State.EXITED:
         podman("start", name)
     podman("attach", name)
 
 
-def _remove_container(name: str, force: bool = False) -> bool:
+# pod rm
+def remove_container(name: str, force: bool = False) -> bool:
     """Remove definitively a container.
 
     The `--force` argument must be the last one, due to a limitation
@@ -214,54 +211,40 @@ def _remove_container(name: str, force: bool = False) -> bool:
         return podman("rm", name)
 
 
-# pod rm
-def remove_container(group: str, version: str, force: bool = False) -> None:
-    """
-    Remove definitively a container.
-
-    The `--force` argument must be last one, due to a limitation
-    in the python-fire library.
-    """
-    print(repr(group), repr(version))
-    group, version = format(group, version)
-    _remove_container(container_name(group, version), force=force)
-
-
 # pode purge
-def purge_containers(version: str, force: bool = False) -> None:
-    """Remove all containers for a given version."""
+def purge_containers(regex: str, force: bool = False) -> None:
+    """Remove all containers matching the given regex."""
     print("Removing containers:")
-    _, version = format("_", version)
     count = 0
     for name in containers_states():
-        assert name.startswith(PREFIX)
-        gp, vers = group_version(name)
-        if vers == version:
+        assert name.startswith(config().prefix)
+        if re.fullmatch(regex, name):
             count += 1
-            if get_state2(gp, vers) == State.UP:
+            if get_state(name) == State.UP:
                 print_warning(
-                    f"Container {name} is still running. Use pod go {gp} {vers} to show it."
+                    f"Container {name} is still running. Use pod go {name} to show it."
                 )
-            remove_container(gp, vers, force=force)
+            remove_container(name, force=force)
     if count == 0:
-        print_warning(f"No container found for version {version}.")
+        print_warning(f"No matching container found for '{regex}'.")
 
 
 # pod purge-all
 def purge_all_containers(force: bool = False) -> None:
     """Remove all containers."""
     print("Removing containers:")
-    _remove_container(f"{PREFIX}-test", force=force)
-    count = 0
+    prefix = config().prefix
+    name = f"{prefix}-{TEST}"
+    if get_state(name) != State.NOT_FOUND:
+        remove_container(name, force=force)
     containers = containers_states()
     for name, state in containers.items():
-        assert name.startswith(PREFIX)
+        assert name.startswith(prefix)
         if state == State.UP:
-            gp, vers = group_version(name)
             print_warning(
-                f"Container {name} is still running. Use `pod go {gp} {vers}` to show it."
+                f"Container {name} is still running. Use `pod go {name}` to show it."
             )
-        _remove_container(name, force=force)
+        remove_container(name, force=force)
     if len(containers) == 0:
         print_warning("No container found.")
 
