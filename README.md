@@ -1,7 +1,10 @@
 # pod — a Podman interface for container management
 
 `pod` automates the creation and lifecycle management of [Podman](https://podman.io/)
-containers, one per student group and submission version, for practical assessments (SAÉ).
+containers.
+
+It was originally developed to review students projects, enabling to create containers on the fly for each student group
+and submission version.
 
 ## Table of contents
 
