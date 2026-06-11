@@ -23,7 +23,7 @@ from pod.tools import (
 
 # pod info
 def info(name: str) -> None:
-    """Give some information on a container."""
+    """Print state and port-forwarding information for a container."""
     print("Container name:", name)
     print("State:", get_state(name).name)
     print("Port forwarding:")
@@ -31,8 +31,8 @@ def info(name: str) -> None:
 
 
 # pod list
-def list_containers():
-    """List the current containers."""
+def list_containers() -> None:
+    """List all containers whose name starts with the configured prefix."""
     podman(
         "ps",
         "-a",
@@ -44,11 +44,18 @@ def list_containers():
 
 
 def initialize_directory(force: bool = False, update: str | Path | None = None) -> None:
-    """
-    Initialize the directory, creating the expected files for the build to work.
+    """Initialize (or update) the pod-build directory.
 
-    If the current directory is named `pod-build`, then it will be used,
-    else a `pod-build` subdirectory is created.
+    Without ``--update``, copies the full default skeleton into the target
+    directory.  If the current working directory is named ``pod-build`` it is
+    used directly; otherwise a ``pod-build/`` subdirectory is created.  The
+    operation is refused if the target already exists and is non-empty, unless
+    ``--force`` is passed.
+
+    With ``--update <path>``, only the single file or subdirectory at
+    ``<path>`` (relative to the skeleton root) is refreshed, leaving the rest
+    of the directory untouched.  This is useful for pulling in an updated
+    ``Dockerfile`` or ``home-dir/`` without clobbering local changes.
     """
     cwd = Path.cwd()
     dst = cwd if cwd.name == POD_BUILD_DIRNAME else cwd / POD_BUILD_DIRNAME
@@ -76,8 +83,14 @@ def initialize_directory(force: bool = False, update: str | Path | None = None) 
 
 # pod build
 def build_image() -> None:
-    """
-    Build the image.
+    """Build the Podman image from the current pod-build directory.
+
+    The current working directory must look like a valid build context:
+    it must contain an ``on_build.bash`` file and a ``home-dir/``
+    subdirectory.  Use ``pod init`` to create a conforming directory first.
+
+    The username baked into the image is taken from ``config.toml``
+    (``user`` key) and must match ``^[a-zA-Z_][a-zA-Z0-9_]*$``.
     """
     cwd = Path.cwd()
     invalid_dir = False
@@ -110,6 +123,22 @@ def build_image() -> None:
 
 
 def _run_container(name: str, host_port: int) -> bool:
+    """Ensure the named container is running, creating it if necessary.
+
+    Behaviour by current container state:
+
+    - **UP** — nothing to do, returns ``True`` immediately.
+    - **EXITED / CREATED** — attempts ``podman start``.  If that fails (e.g.
+      the port stored in the container's config is already in use), the stale
+      container is removed and the function recurses once to recreate it via
+      the NOT_FOUND branch.
+    - **NOT_FOUND** — creates a new detached container with ``podman run``,
+      forwarding ``host_port`` on the host to the guest port defined in
+      ``config.toml``.
+
+    Returns ``True`` on success, ``False`` if the underlying podman command
+    failed.
+    """
     guest_port = config().port
     match get_state(name):
         case State.UP:
@@ -151,10 +180,20 @@ def run_container(
     copy: str | Path | None = None,
     script: str | Path | None = None,
 ) -> None:
-    """Start a new container with this name.
+    """Start a container, optionally copying files or running a script inside it.
 
-    If a container already exist, print a warning and do nothing
-    (use manually `pod reset` if needed).
+    If the container does not exist it is created.  If it already exists but
+    is stopped it is restarted (with automatic recreation if the port binding
+    is stale — see :func:`_run_container`).
+
+    Args:
+        name: Container name.
+        host_port: Port to forward on the host side.  Derived deterministically
+            from ``name`` via :func:`port_from_name` when omitted.
+        copy: Local directory whose *contents* are copied into the container's
+            home directory (equivalent to ``podman cp <copy>/. <name>:<home>``).
+        script: Local script file to copy into the container's home directory
+            and execute there in a detached bash session.
     """
     if host_port is None:
         host_port = port_from_name(name)
@@ -177,30 +216,36 @@ def run_container(
 
 
 # pod test
-def test_image():
+def test_image() -> None:
+    """Start and attach to the ephemeral test container.
+
+    The test container is named ``<prefix>-<TEST>`` (e.g. ``POD-test-0.0``).
+    It is created from the current image if it does not exist yet.  Use this
+    command to verify that a freshly built image behaves as expected before
+    deploying containers to students.
+    """
     attach_container(f"{config().prefix}-{TEST}")
 
 
 # pod go
 def attach_container(name: str) -> None:
-    """Show the container for this group/version.
+    """Attach to a container, starting or creating it first if needed.
 
-    Start or create it if needed.
+    Delegates start/create logic to :func:`_run_container` so that stale port
+    bindings are handled consistently: if ``podman start`` fails the container
+    is automatically recreated with the current port mapping.
     """
-    state = get_state(name)
-    if state == State.NOT_FOUND:
-        run_container(name)
-    elif state == State.EXITED:
-        podman("start", name)
+    _run_container(name, port_from_name(name))
     podman("attach", name)
 
 
 # pod rm
 def remove_container(name: str, force: bool = False) -> bool:
-    """Remove definitively a container.
+    """Remove a container permanently.
 
-    The `--force` argument must be the last one, due to a limitation
-    in the python-fire library.
+    Pass ``--force`` to remove a running container without stopping it first.
+    Note: due to a limitation in python-fire, ``--force`` must come *after*
+    the container name on the command line.
     """
     if not isinstance(force, bool):
         print_error(f"Invalid argument for --force: {force!r}.")
@@ -211,9 +256,15 @@ def remove_container(name: str, force: bool = False) -> bool:
         return podman("rm", name)
 
 
-# pode purge
+# pod purge
 def purge_containers(regex: str, force: bool = False) -> None:
-    """Remove all containers matching the given regex."""
+    """Remove all containers whose full name matches ``regex``.
+
+    The regex is matched against the complete container name (including the
+    configured prefix), using :func:`re.fullmatch`.  Running containers are
+    flagged with a warning; pass ``--force`` to remove them without stopping
+    first.
+    """
     print("Removing containers:")
     count = 0
     for name in containers_states():
@@ -231,7 +282,11 @@ def purge_containers(regex: str, force: bool = False) -> None:
 
 # pod purge-all
 def purge_all_containers(force: bool = False) -> None:
-    """Remove all containers."""
+    """Remove all containers, including the test container.
+
+    Running containers are flagged with a warning; pass ``--force`` to remove
+    them without stopping first.
+    """
     print("Removing containers:")
     prefix = config().prefix
     name = f"{prefix}-{TEST}"
