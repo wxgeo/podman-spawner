@@ -1,10 +1,13 @@
 import json
+import sys
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from enum import Enum
 from functools import cache
 from subprocess import run
 from typing import Any
+
+from colored_messages import print_error, print_info
 
 
 class State(Enum):
@@ -62,9 +65,29 @@ def config() -> Config:
     once per process; run ``pod`` from the directory that contains
     ``config.toml``.
     """
-    with open("config.toml", "rb") as f:
-        data = tomllib.load(f)
-    return Config(**data)
+    try:
+        with open("config.toml", "rb") as f:
+            data = tomllib.load(f)
+    except FileNotFoundError:
+        print_error("File `config.toml` was not found")
+        print_info("Hint: use `pod init` to initialize a pod directory.")
+        sys.exit(1)
+    try:
+        config = Config(**data)
+    except TypeError:
+        # Compare data keys and Config fields, to report a useful message.
+        expected = {f.name for f in fields(Config)}
+        actual = set(data.keys())
+        missing = expected - actual
+        unexpected = actual - expected
+        if missing:
+            print_error(f"Missing keys in `config.toml`: {', '.join(sorted(missing))}")
+        if unexpected:
+            print_error(
+                f"Unknown keys in `config.toml`: {', '.join(sorted(unexpected))}"
+            )
+        sys.exit(1)
+    return config
 
 
 def containers_states() -> dict[str, State]:
