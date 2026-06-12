@@ -18,5 +18,4 @@ _check-branch branch="main":
 
 release: _check-clean _check-branch test
     rm -rf dist/
-    @{{uv}} run semantic-release version
-    uv publish
+    {{uv}} publish
