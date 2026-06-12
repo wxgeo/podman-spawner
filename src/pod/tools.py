@@ -73,7 +73,7 @@ def config() -> Config:
         print_info("Hint: use `pod init` to initialize a pod directory.")
         sys.exit(1)
     try:
-        config = Config(**data)
+        config_ = Config(**data)
     except TypeError:
         # Compare data keys and Config fields, to report a useful message.
         expected = {f.name for f in fields(Config)}
@@ -87,7 +87,7 @@ def config() -> Config:
                 f"Unknown keys in `config.toml`: {', '.join(sorted(unexpected))}"
             )
         sys.exit(1)
-    return config
+    return config_
 
 
 def containers_states() -> dict[str, State]:
