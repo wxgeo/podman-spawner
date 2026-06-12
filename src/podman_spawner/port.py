@@ -24,7 +24,7 @@ def port_from_name(name: str, start: int = 1024, end: int = 65535) -> int:
         RuntimeError: If every port in the range is occupied.
     """
     hash_int = int(hashlib.sha256(name.encode()).hexdigest(), 16)
-    base_port = start + (hash_int % (end - start))
+    base_port = start + (hash_int % (end - start) if end - start else 0)
 
     for offset in range(end - start):
         port = start + (base_port - start + offset) % (end - start)

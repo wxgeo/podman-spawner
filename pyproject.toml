@@ -1,14 +1,35 @@
 [project]
-name = "pod"
+name = "podman-spawner"
 version = "0.1.0"
-description = "Gestionnaire de containeurs pour les SAÉ"
+description = "a Podman interface for container management"
 authors = [{ name = "Nicolas Pourcelot", email = "nicolas.pourcelot@gmail.com" }]
+keywords = ["podman", "containers", "docker"]
 readme = "README.md"
+license = "MIT"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Containers",
+    "Topic :: Education :: Testing",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+]
 requires-python = ">=3.11"
 dependencies = [
     "colored-messages>=0.1.0",
     "fire >= 0.6.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/wxgeo/podman-spawner"
+
 
 [dependency-groups]
 dev = [
@@ -17,7 +38,7 @@ dev = [
 ]
 
 [project.scripts]
-pod = 'pod.cli:main'
+pod = 'podman_spawner.cli:main'
 
 [build-system]
 requires = ["uv_build>=0.9.6,<0.11.0"]
@@ -25,4 +46,4 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-root = "src"
-module-name = "pod"
+module-name = "podman_spawner"

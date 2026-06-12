@@ -6,13 +6,13 @@ from pathlib import Path
 import fire  # type: ignore
 from colored_messages import print_error, print_info, print_success, print_warning
 
-from pod.config import (
+from podman_spawner.config import (
     ASSETS_DIR,
     POD_BUILD_DIRNAME,
     TEST,
 )
-from pod.port import port_from_name
-from pod.tools import (
+from podman_spawner.port import port_from_name
+from podman_spawner.tools import (
     State,
     config,
     containers_states,
@@ -175,10 +175,10 @@ def _run_container(name: str, host_port: int) -> bool:
 
 
 def run_container(
-    name: str,
-    host_port: int | None = None,
-    copy: str | Path | None = None,
-    script: str | Path | None = None,
+        name: str,
+        host_port: int | None = None,
+        copy: str | Path | None = None,
+        script: str | Path | None = None,
 ) -> None:
     """Start a container, optionally copying files or running a script inside it.
 

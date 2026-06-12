@@ -1,6 +1,6 @@
 # Podman Spawner — a Podman interface for container management
 
-`pod` automates the creation and lifecycle management of [Podman](https://podman.io/)
+`podman-spawner` automates the creation and lifecycle management of [Podman](https://podman.io/)
 containers, easing the creation of temporary podman images.
 
 It was originally developed to review students projects, enabling to create containers on the fly for each student group
