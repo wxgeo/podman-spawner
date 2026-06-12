@@ -304,9 +304,7 @@ def purge_all_containers(force: bool = False) -> None:
         print_warning("No container found.")
 
 
-def main() -> None:
-    fire.Fire(
-        {
+COMMANDS = {
             "init": initialize_directory,
             "build": build_image,
             "test": test_image,
@@ -317,6 +315,11 @@ def main() -> None:
             "info": info,
             "list": list_containers,
         }
+
+
+def main() -> None:
+    fire.Fire(
+        COMMANDS
     )
 
 
