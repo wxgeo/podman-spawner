@@ -9,6 +9,8 @@ from typing import Any
 
 from colored_messages import print_error, print_info
 
+from podman_spawner.config import CONFIG_FILE
+
 
 class State(Enum):
     """Lifecycle state of a Podman container.
@@ -38,7 +40,7 @@ _PODMAN_STATE_MAP: dict[str, State] = {
 
 @dataclass
 class Config:
-    """Runtime configuration loaded from ``config.toml``.
+    f"""Runtime configuration loaded from ``{CONFIG_FILE}l``.
 
     Attributes:
         prefix: Prefix prepended to every container name (e.g. ``"POD"``).
@@ -58,18 +60,18 @@ class Config:
 
 @cache
 def config() -> Config:
-    """Load and return the project configuration.
+    f"""Load and return the project configuration.
 
-    Reads ``config.toml`` from the *current working directory* and returns a
+    Reads ``{CONFIG_FILE}` from the *current working directory* and returns a
     :class:`Config` instance.  The result is cached so the file is read only
     once per process; run ``pod`` from the directory that contains
-    ``config.toml``.
+    ``{CONFIG_FILE}``.
     """
     try:
-        with open("config.toml", "rb") as f:
+        with open(CONFIG_FILE, "rb") as f:
             data = tomllib.load(f)
     except FileNotFoundError:
-        print_error("File `config.toml` was not found")
+        print_error(f"File `{CONFIG_FILE}` was not found")
         print_info("Hint: use `pod init` to initialize a pod directory.")
         sys.exit(1)
     try:
@@ -81,10 +83,12 @@ def config() -> Config:
         missing = expected - actual
         unexpected = actual - expected
         if missing:
-            print_error(f"Missing keys in `config.toml`: {', '.join(sorted(missing))}")
+            print_error(
+                f"Missing keys in `{CONFIG_FILE}`: {', '.join(sorted(missing))}"
+            )
         if unexpected:
             print_error(
-                f"Unknown keys in `config.toml`: {', '.join(sorted(unexpected))}"
+                f"Unknown keys in `{CONFIG_FILE}`: {', '.join(sorted(unexpected))}"
             )
         sys.exit(1)
     return config_

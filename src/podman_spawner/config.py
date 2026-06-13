@@ -18,3 +18,5 @@ ASSETS_DIR = POD_DIR / "assets"
 
 # Expected name of the pod build context directory.
 POD_BUILD_DIRNAME = "pod-build"
+
+CONFIG_FILE = "pod-config.toml"

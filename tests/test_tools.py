@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from podman_spawner import tools
+from podman_spawner.config import CONFIG_FILE, ASSETS_DIR, POD_BUILD_DIRNAME
 from podman_spawner.tools import Config, State, config, containers_states, get_state
 
 
@@ -17,7 +18,7 @@ def _clear_config_cache() -> None:
 
 
 def test_config_valid(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    (tmp_path / "config.toml").write_text(
+    (tmp_path / CONFIG_FILE).write_text(
         'prefix = "POD"\nport = 2026\nuser = "tester"\n'
     )
     monkeypatch.chdir(tmp_path)
@@ -36,7 +37,7 @@ def test_config_missing_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_config_missing_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    (tmp_path / "config.toml").write_text('prefix = "POD"\nport = 2026\n')  # no `user`
+    (tmp_path / CONFIG_FILE).write_text('prefix = "POD"\nport = 2026\n')  # no `user`
     monkeypatch.chdir(tmp_path)
 
     with pytest.raises(SystemExit):
@@ -44,7 +45,7 @@ def test_config_missing_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_config_unexpected_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    (tmp_path / "config.toml").write_text(
+    (tmp_path / CONFIG_FILE).write_text(
         'prefix = "POD"\nport = 2026\nuser = "tester"\nextra = "oops"\n'
     )
     monkeypatch.chdir(tmp_path)
@@ -125,3 +126,13 @@ def test_get_state_unknown_container(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     assert get_state("POD-DOES-NOT-EXIST") == State.NOT_FOUND
+
+def test_assets():
+    defaults = ASSETS_DIR / "defaults"
+    assert defaults.is_dir()
+    pod_build_dir = defaults / POD_BUILD_DIRNAME
+    assert pod_build_dir.is_dir()
+    assert (pod_build_dir / CONFIG_FILE).is_file()
+
+
+
