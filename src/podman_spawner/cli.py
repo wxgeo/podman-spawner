@@ -86,20 +86,21 @@ def build_image() -> None:
     """Build the Podman image from the current pod-build directory.
 
     The current working directory must look like a valid build context:
-    it must contain an ``on_build.bash`` file and a ``home-dir/``
-    subdirectory.  Use ``pod init`` to create a conforming directory first.
+    it must contain a ``home-dir/``
+    subdirectory and an ``on_build.bash`` file and .  Use ``pod init`` to create a conforming directory first.
 
     The username baked into the image is taken from ``config.toml``
     (``user`` key) and must match ``^[a-zA-Z_][a-zA-Z0-9_]*$``.
     """
+
     cwd = Path.cwd()
     invalid_dir = False
     # Test that the current directory looks like a correct build context.
-    if not (script := cwd / "on_build.bash").is_file():
-        invalid_dir = True
-        print_error(f"File not found: '{script}'.")
     if not (home_dir := cwd / "home-dir").is_dir():
         print_error(f"Directory not found: '{home_dir}'.")
+    if not (script := home_dir / "on_build.bash").is_file():
+        invalid_dir = True
+        print_error(f"File not found: '{script}'.")
     if invalid_dir:
         print_info("Hint: use `pod init` to initialize a pod directory.")
         sys.exit(1)

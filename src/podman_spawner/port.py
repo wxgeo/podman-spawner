@@ -23,6 +23,8 @@ def port_from_name(name: str, start: int = 1024, end: int = 65535) -> int:
     Raises:
         RuntimeError: If every port in the range is occupied.
     """
+    if not isinstance(name, str):
+        raise ValueError(f"Name must be a string, not {type(name)}.")
     hash_int = int(hashlib.sha256(name.encode()).hexdigest(), 16)
     base_port = start + (hash_int % (end - start) if end - start else 0)
 
