@@ -1,6 +1,6 @@
 [project]
 name = "podman-spawner"
-version = "0.3.0"
+version = "0.4.0"
 description = "a Podman interface for container management"
 authors = [{ name = "Nicolas Pourcelot", email = "nicolas.pourcelot@gmail.com" }]
 keywords = ["podman", "containers", "docker"]
