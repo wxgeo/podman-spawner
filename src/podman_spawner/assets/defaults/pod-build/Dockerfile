@@ -36,7 +36,7 @@ USER $USER
 WORKDIR /home/$USER
 
 # Copy defaults user's home files.
-COPY "home-dir/" "/home/$USER"
+COPY --chown=$USER:$USER "home-dir/" "/home/$USER"
 RUN ls -a "/home/$USER" && bash "/home/$USER/on_build.bash"
 
 
