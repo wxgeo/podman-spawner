@@ -1,2 +1,2 @@
 #!/bin/bash
-# Actions to execute at the end of the build process.
+# Actions to execute at the end of the build process, on the *guest*.
