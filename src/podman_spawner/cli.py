@@ -1,6 +1,7 @@
 import re
 import shutil
 from pathlib import Path
+from subprocess import run
 from typing import Annotated, Optional
 
 import typer
@@ -17,7 +18,8 @@ app = typer.Typer(help="Manage Podman containers.")
 # Internal helpers (not exposed as CLI commands)
 # ---------------------------------------------------------------------------
 
-def _run_container(name: str, host_port: int) -> bool:
+
+def _run_container(name: str, host_port: int, reset: bool = False) -> bool:
     """Ensure the named container is running, creating it if necessary.
 
     Behaviour by current container state:
@@ -31,9 +33,15 @@ def _run_container(name: str, host_port: int) -> bool:
       forwarding ``host_port`` on the host to the guest port defined in
       ``config.toml``.
 
+    Set `reset` to True to force the removal of the container and the creation
+    of a new one.
+
     Returns ``True`` on success, ``False`` if the underlying podman command
     failed.
     """
+    if reset:
+        podman("rm", "-f", name)
+        return _run_container(name, host_port, reset=False)
     guest_port = config().port
     match get_state(name):
         case State.UP:
@@ -44,62 +52,34 @@ def _run_container(name: str, host_port: int) -> bool:
             print_warning(
                 f"Could not restart {name!r}; recreating with current port mapping."
             )
-            podman("rm", "-f", name)
-            return _run_container(name, host_port)
+            return _run_container(name, host_port, reset=True)
         case State.NOT_FOUND:
             print(f"Port forwarding: {host_port}->{guest_port}")
             return podman(
-                "run", "-d", "-t",
-                "--name", name,
+                "run",
+                "-d",
+                "-t",
+                "--name",
+                name,
                 "--env=DISPLAY",
-                "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
-                "--hostname", name,
-                "--env", "TERM=xterm-256color",
-                "--publish", f"{host_port}:{guest_port}",
+                "-v",
+                "/tmp/.X11-unix:/tmp/.X11-unix",
+                "--hostname",
+                name,
+                "--env",
+                "TERM=xterm-256color",
+                "--publish",
+                f"{host_port}:{guest_port}",
                 config().image_name,
             )
         case _:
             raise NotImplementedError
 
 
-def run_container(
-    name: str,
-    host_port: int | None = None,
-    copy: str | Path | None = None,
-    script: str | Path | None = None,
-) -> None:
-    """Start a container, optionally copying files or running a script inside it.
-
-    If the container does not exist it is created.  If it already exists but
-    is stopped it is restarted (with automatic recreation if the port binding
-    is stale — see :func:`_run_container`).
-
-    Args:
-        name: Container name.
-        host_port: Port to forward on the host side.  Derived deterministically
-            from ``name`` via :func:`port_from_name` when omitted.
-        copy: Local directory whose *contents* are copied into the container's
-            home directory (equivalent to ``podman cp <copy>/. <name>:<home>``).
-        script: Local script file to copy into the container's home directory
-            and execute there in a detached bash session.
-    """
-    if host_port is None:
-        host_port = port_from_name(name)
-    _run_container(name, host_port)
-    home = Path(f"/home/{config().user}/")
-    if copy is not None:
-        # Docker documentation specifies to add "/." at the end of the source
-        # path, so as to copy the folder content (and not the folder itself).
-        podman("cp", f"{copy}/.", f"{name}:{home}")
-    if script is not None:
-        script = Path(script)
-        podman("cp", str(script), f"{name}:{home / script.name}")
-        podman("exec", "-d", name, "bash", str(home / script.name))
-
-
 # ---------------------------------------------------------------------------
 # CLI commands
 # ---------------------------------------------------------------------------
+
 
 @app.command("info")
 def info(name: str) -> None:
@@ -114,16 +94,24 @@ def info(name: str) -> None:
 def list_containers() -> None:
     """List all containers whose name starts with the configured prefix."""
     podman(
-        "ps", "-a",
-        "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}",
-        "--filter", f"name=^{config().prefix}",
+        "ps",
+        "-a",
+        "--format",
+        "table {{.Names}}\t{{.Status}}\t{{.Ports}}",
+        "--filter",
+        f"name=^{config().prefix}",
     )
 
 
 @app.command("init")
 def initialize_directory(
-    force: Annotated[bool, typer.Option("--force", help="Overwrite an existing pod-build directory.")] = False,
-    update: Annotated[Optional[str], typer.Option("--update", help="Refresh only this file or subdirectory.")] = None,
+    force: Annotated[
+        bool, typer.Option("--force", help="Overwrite an existing pod-build directory.")
+    ] = False,
+    update: Annotated[
+        Optional[str],
+        typer.Option("--update", help="Refresh only this file or subdirectory."),
+    ] = None,
 ) -> None:
     """Initialize (or update) the pod-build directory.
 
@@ -168,14 +156,14 @@ def build_image() -> None:
     an on_build.bash file inside it.  Use `pod init` to create a conforming
     directory first.
 
-    The username baked into the image is taken from config.toml (user key).
+    The username baked into the image is taken from pod-config.toml (`user` key).
     """
     cwd = Path.cwd()
     invalid_dir = False
     if not (home_dir := cwd / "home-dir").is_dir():
         print_error(f"Directory not found: '{home_dir}'.")
         invalid_dir = True
-    if not (script := cwd / "home-dir" / "on_build.bash").is_file():
+    if not (script := home_dir / "on_build.bash").is_file():
         print_error(f"File not found: '{script}'.")
         invalid_dir = True
     if invalid_dir:
@@ -186,6 +174,8 @@ def build_image() -> None:
         print_error(f"Invalid user name: {user!r}.")
         raise typer.Exit(code=1)
     image_name = config().image_name
+    if (prepare_build := cwd / "prepare_build.bash").is_file():
+        run(["bash", str(prepare_build.resolve())])
     if podman("build", "-t", image_name, "--build-arg", f"USER={user}", str(cwd)):
         print_success(f"Image {image_name} built.")
     else:
@@ -204,6 +194,53 @@ def test_image() -> None:
     attach_container(f"{config().prefix}-{TEST}")
 
 
+@app.command("run")
+def run_container(
+    name: str,
+    host_port: Annotated[
+        Optional[int],
+        typer.Option("--port", help="Host port (derived from name if omitted)."),
+    ] = None,
+    copy: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--copy",
+            help="Directory whose contents are copied into the container's home.",
+        ),
+    ] = None,
+    script: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--script", help="Script to copy and execute inside the container."
+        ),
+    ] = None,
+    reset: Annotated[
+        bool,
+        typer.Option(
+            "--reset",
+            help="Force the creation of a new container. Any existing one of the same name will be deleted first.",
+        ),
+    ] = False,
+) -> None:
+    """Start a container in the background, optionally deploying files.
+
+    If the container does not exist it is created. If it already exists but
+    is stopped it is restarted (with automatic recreation if the port binding
+    is stale).
+    """
+    if host_port is None:
+        host_port = port_from_name(name)
+    _run_container(name, host_port, reset=reset)
+    home = Path(f"/home/{config().user}/")
+    if copy is not None:
+        # Docker documentation specifies to add "/." at the end of the source
+        # path, so as to copy the folder content (and not the folder itself).
+        podman("cp", f"{copy}/.", f"{name}:{home}")
+    if script is not None:
+        podman("cp", str(script), f"{name}:{home / script.name}")
+        podman("exec", "-d", name, "bash", str(home / script.name))
+
+
 @app.command("go")
 def attach_container(name: str) -> None:
     """Attach to a container, starting or creating it first if needed.
@@ -219,7 +256,12 @@ def attach_container(name: str) -> None:
 @app.command("rm")
 def remove_container(
     name: str,
-    force: Annotated[bool, typer.Option("--force", help="Remove a running container without stopping it first.")] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force", help="Remove a running container without stopping it first."
+        ),
+    ] = False,
 ) -> None:
     """Remove a container permanently."""
     if force:
@@ -231,7 +273,9 @@ def remove_container(
 @app.command("purge")
 def purge_containers(
     regex: str,
-    force: Annotated[bool, typer.Option("--force", help="Also remove running containers.")] = False,
+    force: Annotated[
+        bool, typer.Option("--force", help="Also remove running containers.")
+    ] = False,
 ) -> None:
     """Remove all containers whose full name matches REGEX.
 
@@ -256,7 +300,9 @@ def purge_containers(
 
 @app.command("purge-all")
 def purge_all_containers(
-    force: Annotated[bool, typer.Option("--force", help="Also remove running containers.")] = False,
+    force: Annotated[
+        bool, typer.Option("--force", help="Also remove running containers.")
+    ] = False,
 ) -> None:
     """Remove all containers, including the test container.
 

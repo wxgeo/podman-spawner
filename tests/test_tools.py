@@ -101,7 +101,9 @@ def test_containers_states_empty_output(monkeypatch: pytest.MonkeyPatch) -> None
     assert containers_states() == {}
 
 
-def test_containers_states_unknown_state_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_containers_states_unknown_state_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _set_config(monkeypatch)
     output = json.dumps([{"Names": ["POD-WEIRD"], "State": "paused"}])
     monkeypatch.setattr(tools, "run", lambda *a, **kw: _FakeCompletedProcess(output))
@@ -127,12 +129,10 @@ def test_get_state_unknown_container(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert get_state("POD-DOES-NOT-EXIST") == State.NOT_FOUND
 
+
 def test_assets():
     defaults = ASSETS_DIR / "defaults"
     assert defaults.is_dir()
     pod_build_dir = defaults / POD_BUILD_DIRNAME
     assert pod_build_dir.is_dir()
     assert (pod_build_dir / CONFIG_FILE).is_file()
-
-
-
